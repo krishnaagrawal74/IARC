@@ -7,7 +7,7 @@
 #define ir7  A0
 #define ir8  2
 
-int v = 50;
+int v = 60;
 int u = 0;
 
 int ir[8];
@@ -55,9 +55,9 @@ void turnRight() {
   analogWrite(MR2, v);
 }
 
-void moveBackward() {
-  analogWrite(ML1, u);
-  analogWrite(ML2, v);
+void turnBackward() {
+  analogWrite(ML1, v);
+  analogWrite(ML2, u);
   analogWrite(MR1, u);
   analogWrite(MR2, v);
 }
@@ -79,14 +79,43 @@ void loop() {
   ir[6] = digitalRead(ir7);
   ir[7] = digitalRead(ir8);
 
-  // Line detection logic
-  if (ir[7] || ir[6] ) {
-    turnLeft();
-  } else if (ir[3] || ir[4] || ir[2] || ir[5]) {
-    moveForward();
-  } else if (ir[0] || ir[1]) {
-    turnRight();
-  } else if(!ir[0] && !ir[1] && !ir[2] && !ir[3] && !ir[4] && !ir[5] && !ir[6] && !ir[7]){
-    moveBackward();
+  // Print IR values for debugging
+  Serial.print("IR: ");
+  for (int i = 0; i < 8; i++) {
+    Serial.print(ir[i]);
+    Serial.print(" ");
   }
+  Serial.println();
+
+  // Prioritize LEFT movement first
+  if (ir[7] || ir[6] || ir[5]) {  
+    turnLeft();
+    Serial.println("Left");
+  } 
+  // If no left signal, check for forward movement
+  else if (ir[3] || ir[4]) {  
+    moveForward();
+    Serial.println("Forward");
+  } 
+  // If neither left nor forward, check for right
+  else if (ir[0] || ir[1] || ir[2]) {  
+    turnRight();
+    Serial.println("Right");
+  } 
+  // If no sensor detects anything, check again before moving backward
+  else {  
+    delay(50);  
+    bool allZero = true;
+    for (int i = 0; i < 8; i++) {
+      if (ir[i] == 1) {
+        allZero = false;
+        break;
+      }
+    }
+    if (allZero) {
+      turnBackward();
+      Serial.println("Backward");
+    }
+  }
+  delay(10); // Small delay for stability
 }
