@@ -1,0 +1,166 @@
+#define ir1  A3
+#define ir2  A2
+#define ir3  7
+#define ir4  6
+#define ir5  A1
+#define ir6  4
+#define ir7  A0
+#define ir8  2
+
+#define ML1 3
+#define ML2 5
+#define MR1 9
+#define MR2 10
+
+#define TRIG_PIN 11  // Ultrasonic sensor trigger pin
+#define ECHO_PIN 12  // Ultrasonic sensor echo pin
+
+int irPins[8] = {ir1, ir2, ir3, ir4, ir5, ir6, ir7, ir8};
+
+int v = 150;
+int u = 0;
+int speed = 100;
+int baseSpeed = speed;  // Base speed
+float Kp = 20, Ki = 0, Kd = 15;  // PID constants
+int ir[8];
+int lastError = 0;
+float integral = 0;
+
+void setup() {
+  for (int i = 0; i < 8; i++) {
+    pinMode(irPins[i], INPUT);
+  }
+
+  pinMode(ML1, OUTPUT);
+  pinMode(ML2, OUTPUT);
+  pinMode(MR1, OUTPUT);
+  pinMode(MR2, OUTPUT);
+
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  Serial.begin(9600);
+}
+
+int calculateError() {
+  int weights[8] = {-4, -3, -2, -1, 1, 2, 3, 4};
+  int sum = 0, activeSensors = 0;
+  
+  for (int i = 0; i < 8; i++) {
+    ir[i] = digitalRead(irPins[i]);
+    sum += ir[i] * weights[i];
+    activeSensors += ir[i];
+  }
+  
+  return (activeSensors == 0) ? lastError : sum / activeSensors;
+}
+
+void pidControl() {
+  int error = calculateError();
+  int derivative = error - lastError;
+  integral += error;
+  int correction = (Kp * error) + (Ki * integral) + (Kd * derivative);
+  lastError = error;
+
+  int leftSpeed = constrain(baseSpeed - correction, 0, 255);
+  int rightSpeed = constrain(baseSpeed + correction, 0, 255);
+
+  analogWrite(ML1, leftSpeed);
+  analogWrite(ML2, 0);
+  analogWrite(MR1, rightSpeed);
+  analogWrite(MR2, 0);
+}
+
+void turnLeft() {
+  analogWrite(ML1, u);
+  analogWrite(ML2, v);
+  analogWrite(MR1, v);
+  analogWrite(MR2, u);
+}
+
+void turnRight() {
+  analogWrite(ML1, v);
+  analogWrite(ML2, u);
+  analogWrite(MR1, u);
+  analogWrite(MR2, v);
+}
+
+void turnBackward() {
+  analogWrite(ML1, v);
+  analogWrite(ML2, u);
+  analogWrite(MR1, u);
+  analogWrite(MR2, v);
+}
+
+void brake() {
+  analogWrite(ML1, 0);
+  analogWrite(ML2, 0);
+  analogWrite(MR1, 0);
+  analogWrite(MR2, 0);
+  delay(100);  // Small delay for stability
+}
+
+float getDistance() {
+  // Trigger the ultrasonic sensor
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  // Read the echo pulse duration
+  long duration = pulseIn(ECHO_PIN, HIGH);
+
+  // Convert duration to distance in cm
+  float distance = duration * 0.034 / 2;
+  return distance;
+}
+
+void loop() {
+  // Check for obstacles using the ultrasonic sensor
+  float distance = getDistance();
+  Serial.print("Distance: ");
+  Serial.println(distance);
+
+  // If an obstacle is detected within 10 cm, turn 180 degrees
+  if (distance < 10) {
+    brake();  // Stop the bot
+    turnBackward();  // Turn 180 degrees
+    delay(500);  // Adjust delay for a full 180-degree turn
+    brake();  // Stop after turning
+    return;  // Skip the rest of the loop
+  }
+
+  // Read IR sensor values
+  for (int i = 0; i < 8; i++) {
+    ir[i] = digitalRead(irPins[i]);
+  }
+
+  // Check if a junction exists (multiple sensors detecting black)
+  int activeSensors = 0;
+  for (int i = 0; i < 8; i++) {
+    activeSensors += ir[i];
+  }
+
+  // If a left-only junction is detected (left sensors active but not right)
+  if ((ir[7] && ir[6] && ir[5])) {
+    brake();  // Stop briefly to avoid overshoot
+    baseSpeed = 150; // Reduce speed for the turn
+    turnLeft();
+    delay(100);  // Give time to turn
+    baseSpeed = speed; // Restore speed after turn
+  } else if (ir[7] || ir[6] || ir[5]) {
+    turnLeft();
+    Serial.println("Left");
+  } else if (ir[3] || ir[4]) { // Move forward if center sensors detect black
+    pidControl();
+    Serial.println("Forward");
+  } else if (ir[0] || ir[1] || ir[2]) { // Turn right if right sensors detect black
+    turnRight();
+    Serial.println("Right");
+  } else { 
+    delay(50);
+    turnBackward();
+    Serial.println("Backward");
+  }
+}
