@@ -1,20 +1,20 @@
-#define ir1  A3
-#define ir2  A2
-#define ir3  7
-#define ir4  6
-#define ir5  A1
-#define ir6  4
-#define ir7  A0
+#define ir1  A0
+#define ir2  A1
+#define ir3  A2
+#define ir4  A3
+#define ir5  A4
+#define ir6  A5
+#define ir7  7
 #define ir8  2
 
-#define ML1 3
-#define ML2 5
-#define MR1 9
-#define MR2 10
+#define ML1 5
+#define ML2 10
+#define MR1 3
+#define MR2 9
 
 int irPins[8] = {ir1, ir2, ir3, ir4, ir5, ir6, ir7, ir8};
 
-int v = 60;
+int v = 120;
 int u = 0;
 
 int baseSpeed = 60;
@@ -116,7 +116,7 @@ void loop() {
   }
   // If no sensor detects anything, check again before moving backward
   else {
-    delay(50);
+//    delay(50);
 
     turnBackward();
     Serial.println("Backward");
